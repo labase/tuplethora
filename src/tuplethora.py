@@ -30,13 +30,49 @@ ROTATE = {I: [J, Z, Y, K], J: [Z, I, K, X], K: [J, I, Y, X],
 RBOW = [color.red, color.orange, color.yellow, color.green, color.cyan, color.blue, color.magenta, color.white]
 
 
+def vec_soma(i, j):
+    x, y, z = i
+    a, b, c = j
+    return 2*a+x, 2*b+y, 2*c+z
+
+
+class Peca:
+    def __init__(self, peca, pos):
+        self.tipo, self.cor = tipo, cor = peca
+        self.pos = x, y, z = pos
+        xyz = (VAO*x, VAO*y, VAO*z)
+        self.peca = tipo(pos=xyz, size=(4, 4, 4), color= cor)
+        #box(pos=xyz, size=(6, 6, 6), color= RBOW[z//VAO], opacity=0.2)
+
+    def move(self, destino):
+        self.pos = destino
+        self.peca.pos = vec(destino)
+
+
+class Casa:
+    def __init__(self, pos):
+        self.peca = None
+        self.pos = x, y, z = pos
+        box(pos=(VAO*x, VAO*y, VAO*z), size=(2, 2, 2), opacity=0.05)
+
+    def joga(self):
+        self.peca = Peca((box, color.red), self.pos)
+
+    def recebe(self, peca):
+        self.peca = peca
+        self.peca.move(self.pos)
+
+    def limpa(self):
+        self.peca = None
+
+
 class Tabuleiro:
     def __init__(self):
         def joga(peca, xyz):
             tipo, cor = peca
             x, y, z = xyz
-            tipo(pos=xyz, size=(4, 4, 4), color= cor)
-            box(pos=xyz, size=(6, 6, 6), color= RBOW[z//VAO], opacity=0.2)
+            #tipo(pos=xyz, size=(4, 4, 4), color= cor)
+            #box(pos=xyz, size=(6, 6, 6), color= RBOW[z//VAO], opacity=0.2)
         self.angle = 0
         self.jogadas = {
             OESTE: self.oeste, NORTE: self.norte,
@@ -49,14 +85,17 @@ class Tabuleiro:
         cena.width = 1000
         cena.height = 800
         pecas = [(box, color.blue), (sphere, color.red)] * 4 * 4 * 2
-        casas = [box(pos=(coluna*VAO, linha*VAO, camada*VAO), size=(2, 2, 2), opacity=0.05)
-                 for linha in CASAS for coluna in CASAS
-                 for camada in CASAS]
+        self.casas = {
+            (coluna, linha, camada):
+            Casa(pos=(coluna, linha, camada))
+            for linha in CASAS for coluna in CASAS
+            for camada in CASAS}
 
         shuffle(pecas)
         jogadas = [joga(pecas.pop(), (coluna*VAO, linha*VAO, camada*VAO))
                    for linha in CASAS for coluna in CASAS
                    for camada in CASAS]
+        self.joga()
 
     def teclou(self, ev):
         jogada = ev.keyCode
@@ -65,7 +104,30 @@ class Tabuleiro:
             ev.preventDefault()
             #print("teclou", jogada)
             self.jogadas[jogada]()
-            
+
+    def move(self, casa, sentido):
+        destino = vec_soma(casa.pos, sentido)
+
+        print(casa.pos, destino, sentido)
+        peca = casa.peca
+        while destino in self.casas.keys():
+            self.casas[destino].recebe(peca)
+            casa.limpa()
+            destino = vec_soma(peca.pos, sentido)
+
+            print(peca.pos, destino, sentido)
+
+    def joga(self):
+        vetor = self.cena.forward
+        xyz = (vetor.x, vetor.y, vetor.z)
+        queda = ROTATE[xyz][0]
+        cheios = [casa for casa in self.casas.values() if casa.peca is not None]
+        cheios = [self.move(casa, queda) for casa in cheios]
+
+        vazios = [casa for casa in self.casas.values() if casa.peca is None]
+        shuffle(vazios)
+        vazios.pop().joga()
+
     def rodar(self, vetor, eixo):
         self.angle = 0
 
@@ -100,13 +162,11 @@ class Tabuleiro:
         pass
         self.rodar(self.cena.forward, 3)
 
-    def joga(self):
-        pass
-
 
 def main():
+    global TABULEIRO
     print('Tuplethora %s' % __version__, color, FOCO)
-    Tabuleiro()
+    TABULEIRO = Tabuleiro()
 
 if __name__ == "__main__":
     main()
