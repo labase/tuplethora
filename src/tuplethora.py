@@ -12,138 +12,101 @@ Tuplethora - A 3D game as variation of tic-tac-toe
 
 In Tuplethora you combine the properties of blobs to win.
 """
-from javascript import JSObject
-__version__ = '0.1.0'
-vec = color = opacity = None
-L3, L2 = 6, 4
-CS = 120
-PD = 70
-PO = 10
-OPCY = 0.2
+__version__ = 0.1
+from __random import shuffle
+from browser import doc, timer
+from math import ceil
+from glow import *
+VAO = 8
+LADO = 4
+#CASAS = range(-LADO//2, LADO//2)
+CASAS = (-3, -1, 1, 3)
+OESTE, NORTE, LESTE, SUL, JOGA = 37, 38, 39, 40, 13
+JOGADAS = [OESTE, NORTE, LESTE, SUL, JOGA]
+MUZU = (-1, 0, 1)
+FOCO = I, J, K, Z, Y, X = [(x, y, z) for x in MUZU for y in MUZU for z in MUZU if sum([abs(x), abs(y), abs(z)]) == 1]
+ROTATE = {I: [J, Z, Y, K], J: [Z, I, K, X], K: [J, I, Y, X],
+          Z: [J, X, Y, I], Y: [Z, X, K, I], X: [J, K, Y, Z]}
+RBOW = [color.red, color.orange, color.yellow, color.green, color.cyan, color.blue, color.magenta, color.white]
 
 
-class Blob:
+class Tabuleiro:
+    def __init__(self):
+        def joga(peca, xyz):
+            tipo, cor = peca
+            x, y, z = xyz
+            tipo(pos=xyz, size=(4, 4, 4), color= cor)
+            box(pos=xyz, size=(6, 6, 6), color= RBOW[z//VAO], opacity=0.2)
+        self.angle = 0
+        self.jogadas = {
+            OESTE: self.oeste, NORTE: self.norte,
+            LESTE: self.leste, SUL: self.sul, JOGA: self.joga
+        }
+        doc.bind('keypress', self.teclou)
 
-    def __init__(self, gui):
-        def pc(inb, oub, tin, szi, tou, szo):
-            return lambda ps: inb(tin, szi, ps) + oub(tou, szo, ps)
-        self.jail = None
-        cl = color
-        TIN, TOU, SZI = (cl.magenta, cl.blue), (cl.green, cl.yellow), (20, 0)
-        INB, OUB, SZO = (self.dice, self.ball), (self.frame, self.ring), (15, 0)
-        bpos = [(x*125 - 4*CS, y*125, 3*CS) for x in range(-4, 0) for y in range(-4, 4)]
-        bpos += [(x*125 + 5*CS, y*125, 3*CS) for x in range(0, 4) for y in range(-4, 4)]
-        self.bpos = bpos
-        self.gui = gui
-        self.blober = [
-            pc(inb, oub, tin, szi, tou, szo)
-            for inb in INB for oub in OUB for tin in TIN for szi in SZI for tou in TOU for szo in SZO]
-        self.blob = [blob(pos) for pos, blob in zip(bpos, self.blober)]
+        _gs = glow('main')
+        cena = self.cena = canvas()
+        cena.width = 1000
+        cena.height = 800
+        pecas = [(box, color.blue), (sphere, color.red)] * 4 * 4 * 2
+        casas = [box(pos=(coluna*VAO, linha*VAO, camada*VAO), size=(2, 2, 2), opacity=0.05)
+                 for linha in CASAS for coluna in CASAS
+                 for camada in CASAS]
 
-    def dice(self, tint, size, ps):
-        size += 20
-        return [self.gui.box(pos=ps, size=(CS-PO-size, CS-PO-size, CS-PO-size), color=tint, opacity=OPCY)]
+        shuffle(pecas)
+        jogadas = [joga(pecas.pop(), (coluna*VAO, linha*VAO, camada*VAO))
+                   for linha in CASAS for coluna in CASAS
+                   for camada in CASAS]
 
-    def ball(self, tint, size, ps):
-        size -= 5
-        return [self.gui.sphere(pos=ps, size=(CS-PO-size, CS-PO-size, CS-PO-size), color=tint, opacity=OPCY)]
+    def teclou(self, ev):
+        jogada = ev.keyCode
+        if jogada in JOGADAS:
+            ev.stopPropagation()
+            ev.preventDefault()
+            #print("teclou", jogada)
+            self.jogadas[jogada]()
+            
+    def rodar(self, vetor, eixo):
+        self.angle = 0
 
-    def frame(self, tint, size, ps):
-        return [
-            self.gui.box(pos=ps, size=(CS, PO+size, CS), color=tint, opacity=OPCY),
-            self.gui.box(pos=ps, size=(CS, CS, PO+size), color=tint, opacity=OPCY),
-            self.gui.box(pos=ps, size=(PO+size, CS, CS), color=tint, opacity=OPCY)]
+        def rodando(wait=lambda: None):
+            if self.angle in range(10):
+                self.cena.forward = y.rotate({'angle': self.angle*pi/20, 'axis': vec(a, b, c)._vec})
+                self.angle += 1
+            else:
+                timer.clear_interval(_timer)
+                f = self.cena.forward
+                self.cena.forward = vec(int(f.x*2), int(f.y*2), int(f.z*2))._vec
+                print(self.cena.forward)
 
-    def ring(self, tint, size, ps):
-        RCS = CS + 10
-        return [
-            self.gui.sphere(pos=ps, size=(RCS, PO+2*size, RCS), color=tint, opacity=OPCY),
-            self.gui.sphere(pos=ps, size=(RCS, RCS, PO+2*size), color=tint, opacity=OPCY),
-            self.gui.sphere(pos=ps, size=(PO+2*size, RCS, RCS), color=tint, opacity=OPCY)]
+        azim = (vetor.x, vetor.y, vetor.z)
+        a, b, c = ROTATE[azim][eixo]
+        y = self.cena.forward
+        _timer = timer.set_interval(rodando, 100)
 
-    def click(self, event):
-        obj = self.gui.scene.mouse.pick()
-        objp = obj.pos
-        pos = (objp.x, objp.y, objp.z)
-        #print("blob click", event.type, event.which, pos)  # .x, obj.y, obj.z)
-        if not pos in self.bpos:
-            #print("click not in bpos", self.bpos)
-            return
-        for blob in self.blob:
-            for part in blob:
-                part.visible = False
-        obind = self.bpos.index(pos)
-        for part in self.blob[obind]:
-            part.visible = True
+    def oeste(self):
+        self.rodar(self.cena.forward, 0)
+        pass
 
-        self.jail.toggle(self.blob[obind])
+    def norte(self):
+        self.rodar(self.cena.forward, 1)
+        pass
 
-    def show(self, ablob):
-        self.blob[self.blob.index(ablob)] = []
-        for blob in self.blob:
-            for part in blob:
-                part.visible = True
+    def leste(self):
+        self.rodar(self.cena.forward, 2)
+        pass
 
+    def sul(self):
+        pass
+        self.rodar(self.cena.forward, 3)
 
-class Jail:
-    def __init__(self, gui, blob):
-
-        self.gui = gui
-        blob.jail = self
-        gui.scene.bind("click", self.click)
-        side = (-CS, 0, CS)
-        side = (-3*CS, -CS, CS, 3*CS)
-        self.hole = []
-        self.obj = None
-        self.cell = [[[(x, y, z) for x in side] for y in side] for z in side]
-        self.loci = [(x, y, z) for x in side for y in side for z in side]
-        self._click, self._next = blob.click, self.jail_click
-        self.show = blob.show
-
-    def draw(self):
-        gui = self.gui
-        #print (self.cell)
-        h = self.hole = [gui.box(pos=cell, size=(CS-PD, CS-PD, CS-PD), color=color.gray(0.2), opacity=OPCY)
-                     for plane in self.cell for line in plane for cell in line]
-
-        opacity(JSObject(self.hole[0]._prim), 0.3)
-        h[1].opacity = 0.1
-        #hh = pyobj2jsobj(h[0])
-        jsh = JSObject(h[0]._prim)
-        jsh = h[0]._prim
-        print(jsh.__class__, self.hole[0]._prim.__opacity, opacity )
-        cp = gui.compound(h[:2])
-        cp.opacity = 0.5
-
-        #print(color.blue, list(hole.opacity for hole in self.hole))
-
-    def click(self, event):
-        self._click(event)
-
-    def toggle(self, obj):
-        self.obj = obj
-        self._click, self._next = self._next, self._click
-
-    def jail_click(self, event):
-        obj = self.gui.scene.mouse.pick()
-        objp = obj.pos
-        pos = (objp.x, objp.y, objp.z)
-        #print(event.type, event.which, pos, objp, self.obj)  # .x, obj.y, obj.z)
-        if not pos in self.loci:
-            return
-        #self.gui.sphere(pos=objp, size=(CS-PO, CS-PO, CS-PO), color=color.magenta, opacity=OPCY)
-        for part in self.obj:
-            part.pos = vec(*pos)  # objp
-        obj.visible = False
-        self.loci[self.loci.index(pos)] = None
-        self.show(self.obj)
-        self.toggle(self.obj)
+    def joga(self):
+        pass
 
 
-def main(gui, gvec, gcolor, opc):
-    global vec, color, opacity
-    vec = gvec
-    color = gcolor
-    opacity = opc
-    print('Tuplethora %s' % __version__)
-    Jail(gui, Blob(gui)).draw()
+def main():
+    print('Tuplethora %s' % __version__, color, FOCO)
+    Tabuleiro()
+
+if __name__ == "__main__":
+    main()

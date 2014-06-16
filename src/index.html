@@ -13,42 +13,14 @@ Tuplethora - A 3D game as variation of tic-tac-toe
 
 In Tuplethora you combine the properties of blobs to win.
 -->
+<!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Tuplethora</title>
-        <meta http-equiv="content-type" content="application/xml;charset=utf-8" />
-        <!--script type="text/javascript" src="../../lib/glow/brython_dist.js"></script -->
-        <script type="text/javascript" src="../../lib/Brython2.1.1/brython_dist.js"></script>
-        <script type="text/javascript">
-            var do_opacity = function(target, value){ target.js.opacity = parseFloat(value); }
-        </script>
-        <script type="text/python" src="tuplethora.py"></script>
-        <script type="text/python">
-            from glow import *
-            from browser import doc, html
-            doc[html.HEAD][0] <= html.SCRIPT(
-            "var do_opac = function(target, value){ target.js.opacity = parseFloat(value); }"
-            )
-            class GlowVisual:
-                def __init__(self):
-                    _gs=glow('glowscript')
-                    self.scene=canvas()
-                    self.scene.width = 1200
-                    self.scene.height = 600
-                    #self.gui = gui
-                    self.box = box
-                    self.pyramid = pyramid
-                    self.arrow = arrow
-                    self.cylinder = cylinder
-                    self.sphere = sphere
-                    self.cone = cone
-                    self.helix = helix
-                    self.compound = compound
-            main(GlowVisual(), vec, color, do_opac)
-        </script>
-    </head>
-    <body onLoad="brython(1)">
-        <div id="glowscript" class="glowscript"></div>
-    </body>
+<head>
+    <title> Velha 3D</title>
+    <script type ="text/javascript"src = "../../lib/Brython2.1.2/brython.js"></script>
+    <script type="text/python" src="tuplethora.py"></script>
+</head>
+<body onload="brython(2)">
+<div id = "main"></div>
+</body>
 </html>
