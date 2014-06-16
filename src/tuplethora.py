@@ -18,16 +18,22 @@ from browser import doc, timer
 from math import ceil
 from glow import *
 VAO = 8
-LADO = 4
+LADO = 3
 #CASAS = range(-LADO//2, LADO//2)
-CASAS = (-3, -1, 1, 3)
+#CASAS = (-3, -1, 1, 3)
+CASAS = (-2, 0, 2)
 OESTE, NORTE, LESTE, SUL, JOGA = 37, 38, 39, 40, 13
 JOGADAS = [OESTE, NORTE, LESTE, SUL, JOGA]
 MUZU = (-1, 0, 1)
-FOCO = I, J, K, Z, Y, X = [(x, y, z) for x in MUZU for y in MUZU for z in MUZU if sum([abs(x), abs(y), abs(z)]) == 1]
+FOCO = I, J, K, Z, Y, X = [
+    (x, y, z) for x in MUZU for y in MUZU for z in MUZU
+    if sum([abs(x), abs(y), abs(z)]) == 1]
 ROTATE = {I: [J, Z, Y, K], J: [Z, I, K, X], K: [J, I, Y, X],
           Z: [J, X, Y, I], Y: [Z, X, K, I], X: [J, K, Y, Z]}
-RBOW = [color.red, color.orange, color.yellow, color.green, color.cyan, color.blue, color.magenta, color.white]
+RBOW = [color.red, color.orange, color.yellow, color.green, color.cyan,
+        color.blue, color.magenta, color.red, color.yellow, color.white]
+TYPE = [sphere, cylinder, cone, pyramid, box, sphere, cylinder, cone, pyramid, box]
+TABULEIRO = None
 
 
 def vec_soma(i, j):
@@ -38,15 +44,27 @@ def vec_soma(i, j):
 
 class Peca:
     def __init__(self, peca, pos):
-        self.tipo, self.cor = tipo, cor = peca
-        self.pos = x, y, z = pos
-        xyz = (VAO*x, VAO*y, VAO*z)
-        self.peca = tipo(pos=xyz, size=(4, 4, 4), color= cor)
-        #box(pos=xyz, size=(6, 6, 6), color= RBOW[z//VAO], opacity=0.2)
+        self.pos = pos
+        self.tipo = peca
+        self.peca = None
+        self.create(peca)
 
     def move(self, destino):
-        self.pos = destino
-        self.peca.pos = vec(destino)
+        TABULEIRO.find(self.pos).limpa()
+        self.pos = x, y, z = destino
+        self.peca.pos = vec(VAO*x, VAO*y, VAO*z)
+
+    def vanish(self):
+        print("vanish", self.tipo, self.peca)
+        self.peca.visible = False
+
+    def create(self, peca=0):
+        self.tipo = peca
+        forma, cor = TYPE[peca], RBOW[peca]
+        x, y, z = self.pos
+        xyz = (VAO*x, VAO*y, VAO*z)
+        peca += 5
+        self.peca = forma(pos=xyz, size=(4, 4, 4), color= cor, opacity= peca/15.0)
 
 
 class Casa:
@@ -55,12 +73,32 @@ class Casa:
         self.pos = x, y, z = pos
         box(pos=(VAO*x, VAO*y, VAO*z), size=(2, 2, 2), opacity=0.05)
 
-    def joga(self):
-        self.peca = Peca((box, color.red), self.pos)
+    def joga(self, tipo=0):
+        self.peca = Peca(tipo, self.pos)
+
+    def move(self, sentido):
+        if self.peca is None:
+            return False
+        else:
+            return TABULEIRO.find(self.pos, sentido).recebe(self.peca)
+
+    def movente(self, peca):
+        if self.peca is None:
+            return True
+        return self.peca.tipo == peca.tipo
 
     def recebe(self, peca):
+        if self.peca:
+            if self.peca.tipo != peca.tipo:
+                return False
+            tipo = self.peca.tipo + 1
+            self.peca.vanish()
+            peca.vanish()
+            print("recebevanish", self.peca.tipo, self.peca.pos, peca.tipo, peca.pos)
+            peca.create(tipo)
         self.peca = peca
         self.peca.move(self.pos)
+        return peca
 
     def limpa(self):
         self.peca = None
@@ -74,6 +112,7 @@ class Tabuleiro:
             #tipo(pos=xyz, size=(4, 4, 4), color= cor)
             #box(pos=xyz, size=(6, 6, 6), color= RBOW[z//VAO], opacity=0.2)
         self.angle = 0
+        self.sentido = None
         self.jogadas = {
             OESTE: self.oeste, NORTE: self.norte,
             LESTE: self.leste, SUL: self.sul, JOGA: self.joga
@@ -105,28 +144,37 @@ class Tabuleiro:
             #print("teclou", jogada)
             self.jogadas[jogada]()
 
-    def move(self, casa, sentido):
-        destino = vec_soma(casa.pos, sentido)
+    def recebe(self, peca):
+        return False
 
-        print(casa.pos, destino, sentido)
-        peca = casa.peca
-        while destino in self.casas.keys():
-            self.casas[destino].recebe(peca)
-            casa.limpa()
-            destino = vec_soma(peca.pos, sentido)
+    def find(self, pos, sentido=(0, 0, 0)):
+        destino = vec_soma(pos, sentido)
+        if destino in self.casas.keys():
+            return self.casas[destino]
+        else:
+            return self
 
-            print(peca.pos, destino, sentido)
+    def move(self, peca, sentido):
+        return False
 
     def joga(self):
         vetor = self.cena.forward
         xyz = (vetor.x, vetor.y, vetor.z)
-        queda = ROTATE[xyz][0]
-        cheios = [casa for casa in self.casas.values() if casa.peca is not None]
-        cheios = [self.move(casa, queda) for casa in cheios]
+        self.sentido = sentido = ROTATE[xyz][0]
+        moventes = [casa.peca for casa in self.casas.values() if casa.peca]
 
-        vazios = [casa for casa in self.casas.values() if casa.peca is None]
-        shuffle(vazios)
-        vazios.pop().joga()
+        def movendo():
+            moventes = [peca for peca in moventes if self.find(peca.pos, sentido).recebe(peca)]
+            if not moventes:
+                pass
+                timer.clear_interval(_timer)
+                vazios = [casa for casa in self.casas.values() if casa.peca is None]
+                shuffle(vazios)
+                vazios.pop().joga()
+            return moventes
+
+        _timer = timer.set_interval(movendo, 50)
+        #print(movendo())
 
     def rodar(self, vetor, eixo):
         self.angle = 0
